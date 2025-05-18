@@ -17,7 +17,7 @@ KeyLighting is a lightweight C# console application that mirrors your screen's d
 ## Setup and Usage
 
 1. **Download the latest release**
-   - Go to the [Releases]([https://github.com/your-username/your-repo/releases](https://github.com/ModMaker101/KeyLighting.NET/releases/) page.
+   - Go to the [Releases](https://github.com/ModMaker101/KeyLighting.NET/releases/) page.
    - Download the latest `.zip` file.
 
 2. **Extract the archive**

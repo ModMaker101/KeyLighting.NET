@@ -1,0 +1,31 @@
+{
+    "version": "1.0.0",
+    "numKeys": 107,
+    "downscaleHeight": 35,
+    "updateDelayMs": 32,
+    "brightnessMultiplier": 1.8,
+    "vibranceFactor": 1,
+    "contrastPower": 1.8,
+    "fadeFactor": 3,
+    "darkenThreshold": 65,
+    "darkenFactor": 0.4,
+    "wasdEnabled": false,
+    "wasdKeys": [ 29, 36, 37, 43 ],
+    "wasdColor": {
+        "r": 0,
+        "g": 103,
+        "b": 255
+    },
+    "debugStringUpdates": false,
+    "saveDebugImages": false,
+    "monitorSettings": {
+        "useMonitorIndex": 0,
+        "captureRegion": {
+            "enabled": false,
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080
+        }
+    }    
+}

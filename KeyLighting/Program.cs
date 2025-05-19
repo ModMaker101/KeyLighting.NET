@@ -77,7 +77,8 @@ namespace KeyboardLighting
                 fadeProgress = new float[ledCount];
                 targetColors = new ORGBColor[ledCount];
 
-                using var processor = new CPUImageProcessor();
+                var processor = new CPUImageProcessor(config);
+
                 using var capturer = ConfigureScreenCapturer(config);
 
                 var updateTimer = new System.Timers.Timer(config.UpdateDelayMs);

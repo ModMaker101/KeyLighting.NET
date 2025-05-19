@@ -101,7 +101,11 @@ namespace KeyboardLighting
                 public int Height { get; set; } = 1080;
             }
         }
-        
+        public static class AppSettings
+        {
+            public static LightingConfig Config { get; set; }
+        }
+
 
         // Load configuration from file
         public static LightingConfig LoadFromFile(string filePath)

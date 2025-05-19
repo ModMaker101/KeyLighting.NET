@@ -6,7 +6,7 @@
     "brightnessMultiplier": 1.8,
     "vibranceFactor": 1,
     "contrastPower": 1.8,
-    "fadeFactor": 3,
+    "fadeFactor": 0.9,
     "darkenThreshold": 65,
     "darkenFactor": 0.4,
     "wasdEnabled": false,

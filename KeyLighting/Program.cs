@@ -26,7 +26,8 @@ namespace KeyboardLighting
         static DateTime lastUpdate = DateTime.MinValue;
         static DateTime lastDebugImageSave = DateTime.MinValue;
 
-        static float[] fadeProgress;
+        // Remove fade progress tracking
+        // static float[] fadeProgress;
         static ORGBColor[] targetColors;
 
         const int MIN_CAPTURE_INTERVAL_MS = 16;
@@ -74,7 +75,7 @@ namespace KeyboardLighting
 
                 prevColors = new ORGBColor[ledCount];
                 ledColorsBuffer = new ORGBColor[ledCount];
-                fadeProgress = new float[ledCount];
+                // Removed fadeProgress
                 targetColors = new ORGBColor[ledCount];
 
                 var processor = new CPUImageProcessor(config);
@@ -216,6 +217,8 @@ namespace KeyboardLighting
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void UpdateLedColors(ORGBColor[] columnColors, LightingConfig config, int ledCount)
         {
+            // Check if we want instant transitions (fadeSpeed at or very near 1.0)
+            bool instantTransition = config.FadeFactor >= 0.99;
 
             var wasdEnabled = config.WASDEnabled;
             var wasdKeys = wasdEnabled ? config.WASDKeys : Array.Empty<int>();
@@ -230,75 +233,44 @@ namespace KeyboardLighting
             }
 
             int columnLength = columnColors.Length;
-            float deltaTime = 1.0f / 60.0f;
 
             for (int i = 0; i < ledCount; i++)
             {
                 if (wasdEnabled && Array.IndexOf(wasdKeys, i) >= 0)
                 {
-
-                    continue;
-                }
-                else
-                {
-
-                    int columnIndex = Math.Min(i, columnLength - 1);
-                    targetColors[i] = columnColors[columnIndex];
-                }
-            }
-
-            for (int i = 0; i < ledCount; i++)
-            {
-                if (wasdEnabled && Array.IndexOf(wasdKeys, i) >= 0)
-                {
-
+                    // Handle WASD keys with special color
                     ledColorsBuffer[i] = new ORGBColor(wasdR, wasdG, wasdB);
-                    prevColors[i] = ledColorsBuffer[i];
-                    fadeProgress[i] = 1.0f;
                 }
                 else
                 {
+                    // Apply column colors to the keyboard
+                    int columnIndex = Math.Min(i, columnLength - 1);
 
-                    ORGBColor prev = prevColors[i];
-                    ORGBColor target = targetColors[i];
-
-                    bool colorChanged =
-                        Math.Abs(prev.R - target.R) > 3 ||
-                        Math.Abs(prev.G - target.G) > 3 ||
-                        Math.Abs(prev.B - target.B) > 3;
-
-                    if (colorChanged && fadeProgress[i] >= 1.0f)
+                    if (instantTransition)
                     {
-
-                        fadeProgress[i] = 0.0f;
-                    }
-
-                    fadeProgress[i] = (float)Math.Min(fadeProgress[i] + config.FadeFactor * deltaTime, 1.0f);
-
-                    float t = EaseInOutCubic(fadeProgress[i]);
-
-                    byte r = (byte)Math.Round(prev.R * (1 - t) + target.R * t);
-                    byte g = (byte)Math.Round(prev.G * (1 - t) + target.G * t);
-                    byte b = (byte)Math.Round(prev.B * (1 - t) + target.B * t);
-
-                    ledColorsBuffer[i] = new ORGBColor(r, g, b);
-
-                    if (fadeProgress[i] >= 1.0f)
-                    {
-                        prevColors[i] = target;
+                        // With instantTransition, directly apply the column color
+                        ledColorsBuffer[i] = columnColors[columnIndex];
                     }
                     else
                     {
-                        prevColors[i] = ledColorsBuffer[i];
+                        // For backward compatibility, keep some very minimal smoothing
+                        ORGBColor prev = prevColors[i];
+                        ORGBColor target = columnColors[columnIndex];
+
+                        // Simple lerp with very high weight toward target color
+                        float t = 0.8f; // High value for quick transition but not instant
+
+                        byte r = (byte)Math.Round(prev.R * (1 - t) + target.R * t);
+                        byte g = (byte)Math.Round(prev.G * (1 - t) + target.G * t);
+                        byte b = (byte)Math.Round(prev.B * (1 - t) + target.B * t);
+
+                        ledColorsBuffer[i] = new ORGBColor(r, g, b);
                     }
+
+                    // Store current color for next frame
+                    prevColors[i] = ledColorsBuffer[i];
                 }
             }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static float EaseInOutCubic(float t)
-        {
-            return t < 0.5 ? 4 * t * t * t : 1 - (float)Math.Pow(-2 * t + 2, 3) / 2;
         }
 
         static void SaveDebugImages(Bitmap frame, ORGBColor[] columnColors, LightingConfig config)

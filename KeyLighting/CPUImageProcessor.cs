@@ -422,7 +422,5 @@ public class CPUImageProcessor : IDisposable
         previousFrame = null;
         brightnessLut = null;
         contrastLut = null;
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
     }
 }

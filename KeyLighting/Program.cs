@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -12,6 +13,7 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Numerics;
+using System.Text.Unicode;
 
 namespace KeyboardLighting
 {
@@ -20,14 +22,12 @@ namespace KeyboardLighting
 
     class Program
     {
-
+        static readonly byte[] debugBuffer = new byte[1024];
         static readonly object colorsLock = new object();
         static ORGBColor[]? prevColors;
         static DateTime lastUpdate = DateTime.MinValue;
         static DateTime lastDebugImageSave = DateTime.MinValue;
 
-        // Remove fade progress tracking
-        // static float[] fadeProgress;
         static ORGBColor[] targetColors;
 
         const int MIN_CAPTURE_INTERVAL_MS = 16;
@@ -75,7 +75,7 @@ namespace KeyboardLighting
 
                 prevColors = new ORGBColor[ledCount];
                 ledColorsBuffer = new ORGBColor[ledCount];
-                // Removed fadeProgress
+
                 targetColors = new ORGBColor[ledCount];
 
                 var processor = new CPUImageProcessor(config);
@@ -183,7 +183,30 @@ namespace KeyboardLighting
 
                     if (config.DebugStringUpdates)
                     {
-                        Console.WriteLine($"CPU colors: {string.Join(", ", columnColors.Take(5).Select(c => $"R{c.R},G{c.G},B{c.B}"))}");
+
+                        var span = debugBuffer.AsSpan();
+                        bool success = false;
+                        int written = 0;
+
+                        if (Utf8.TryWrite(span, $"CPU colors: ", out written))
+                        {
+                            span = span.Slice(written);
+                            for (int i = 0; i < Math.Min(5, columnColors.Length); i++)
+                            {
+                                var c = columnColors[i];
+                                if (i > 0 && Utf8.TryWrite(span, $", ", out int commaWritten))
+                                {
+                                    span = span.Slice(commaWritten);
+                                }
+                                if (Utf8.TryWrite(span, $"R{c.R},G{c.G},B{c.B}", out int colorWritten))
+                                {
+                                    span = span.Slice(colorWritten);
+                                    written += colorWritten;
+                                }
+                                else break;
+                            }
+                            Console.WriteLine(Encoding.UTF8.GetString(debugBuffer, 0, debugBuffer.Length - span.Length));
+                        }
                     }
 
                     UpdateLedColors(columnColors, config, ledCount);
@@ -192,7 +215,12 @@ namespace KeyboardLighting
 
                     if (config.DebugStringUpdates)
                     {
-                        Console.WriteLine($"Updated LEDs, first LED: R{ledColorsBuffer[0].R} G{ledColorsBuffer[0].G} B{ledColorsBuffer[0].B}");
+
+                        var span = debugBuffer.AsSpan();
+                        if (Utf8.TryWrite(span, $"Updated LEDs, first LED: R{ledColorsBuffer[0].R} G{ledColorsBuffer[0].G} B{ledColorsBuffer[0].B}", out int written))
+                        {
+                            Console.WriteLine(Encoding.UTF8.GetString(debugBuffer, 0, written));
+                        }
                     }
 
                     if (config.SaveDebugImages &&
@@ -217,7 +245,7 @@ namespace KeyboardLighting
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void UpdateLedColors(ORGBColor[] columnColors, LightingConfig config, int ledCount)
         {
-            // Check if we want instant transitions (fadeSpeed at or very near 1.0)
+
             bool instantTransition = config.FadeFactor >= 0.99;
 
             var wasdEnabled = config.WASDEnabled;
@@ -238,27 +266,26 @@ namespace KeyboardLighting
             {
                 if (wasdEnabled && Array.IndexOf(wasdKeys, i) >= 0)
                 {
-                    // Handle WASD keys with special color
+
                     ledColorsBuffer[i] = new ORGBColor(wasdR, wasdG, wasdB);
                 }
                 else
                 {
-                    // Apply column colors to the keyboard
+
                     int columnIndex = Math.Min(i, columnLength - 1);
 
                     if (instantTransition)
                     {
-                        // With instantTransition, directly apply the column color
+
                         ledColorsBuffer[i] = columnColors[columnIndex];
                     }
                     else
                     {
-                        // For backward compatibility, keep some very minimal smoothing
+
                         ORGBColor prev = prevColors[i];
                         ORGBColor target = columnColors[columnIndex];
 
-                        // Simple lerp with very high weight toward target color
-                        float t = 0.8f; // High value for quick transition but not instant
+                        float t = 0.8f;
 
                         byte r = (byte)Math.Round(prev.R * (1 - t) + target.R * t);
                         byte g = (byte)Math.Round(prev.G * (1 - t) + target.G * t);
@@ -267,12 +294,26 @@ namespace KeyboardLighting
                         ledColorsBuffer[i] = new ORGBColor(r, g, b);
                     }
 
-                    // Store current color for next frame
                     prevColors[i] = ledColorsBuffer[i];
                 }
             }
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void WriteFormattedToConsole<T>(T value) where T : IUtf8SpanFormattable
+        {
+            Span<byte> buffer = stackalloc byte[512];
+            if (value.TryFormat(buffer, out int written, default, null))
+            {
+                Console.WriteLine(Encoding.UTF8.GetString(buffer.Slice(0, written)));
+            }
+        }
+        static class Utf8BufferPool
+        {
+            private static readonly ThreadLocal<byte[]> _threadLocalBuffer =
+                new ThreadLocal<byte[]>(() => new byte[2048]);
 
+            public static byte[] GetBuffer() => _threadLocalBuffer.Value;
+        }
         static void SaveDebugImages(Bitmap frame, ORGBColor[] columnColors, LightingConfig config)
         {
             try
@@ -280,44 +321,34 @@ namespace KeyboardLighting
                 string folder = "images";
                 Directory.CreateDirectory(folder);
 
-                using (var debugBmp = new Bitmap(columnColors.Length, 50))
+                Span<byte> filenameBuffer = stackalloc byte[256];
+                DateTime now = DateTime.Now;
+
+                if (Utf8.TryWrite(filenameBuffer, $"{folder}/debug_frame_{now:yyyyMMdd_HHmmss_fff}.png", out int debugWritten))
                 {
+                    string debugFilename = Encoding.UTF8.GetString(filenameBuffer.Slice(0, debugWritten));
 
-                    var bmpData = debugBmp.LockBits(
-                        new Rectangle(0, 0, debugBmp.Width, debugBmp.Height),
-                        ImageLockMode.WriteOnly,
-                        PixelFormat.Format32bppArgb);
-
-                    IntPtr ptr = bmpData.Scan0;
-                    int bytes = Math.Abs(bmpData.Stride) * debugBmp.Height;
-                    byte[] rgbValues = new byte[bytes];
-
-                    for (int x = 0; x < columnColors.Length; x++)
+                    using (var debugBmp = new Bitmap(columnColors.Length, 50))
                     {
-                        var color = columnColors[x];
-                        for (int y = 0; y < 50; y++)
-                        {
-                            int offset = y * bmpData.Stride + x * 4;
-                            rgbValues[offset] = color.B;
-                            rgbValues[offset + 1] = color.G;
-                            rgbValues[offset + 2] = color.R;
-                            rgbValues[offset + 3] = 255;
-                        }
+
+                        debugBmp.Save(debugFilename, ImageFormat.Png);
                     }
-
-                    Marshal.Copy(rgbValues, 0, ptr, bytes);
-                    debugBmp.UnlockBits(bmpData);
-
-                    string filename = $"{folder}/debug_frame_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png";
-                    debugBmp.Save(filename, ImageFormat.Png);
                 }
 
-                string frameFilename = $"{folder}/captured_frame_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png";
-                frame.Save(frameFilename, ImageFormat.Png);
+                if (Utf8.TryWrite(filenameBuffer, $"{folder}/captured_frame_{now:yyyyMMdd_HHmmss_fff}.png", out int frameWritten))
+                {
+                    string frameFilename = Encoding.UTF8.GetString(filenameBuffer.Slice(0, frameWritten));
+                    frame.Save(frameFilename, ImageFormat.Png);
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving debug images: {ex.Message}");
+
+                var span = debugBuffer.AsSpan();
+                if (Utf8.TryWrite(span, $"Error saving debug images: {ex.Message}", out int written))
+                {
+                    Console.WriteLine(Encoding.UTF8.GetString(debugBuffer, 0, written));
+                }
             }
         }
     }

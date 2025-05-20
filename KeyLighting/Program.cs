@@ -56,14 +56,10 @@ namespace KeyboardLighting
                 var devices = client.GetAllControllerData();
                 int keyboardIndex = -1;
                 int ledCount = 0;
-                //foreach (var device in devices)
-                //{
-                //    Console.WriteLine($"Name: {device.Name}, Type: {device.Type}, LEDs: {device.Leds.Length}");
-                //}
 
                 for (int i = 0; i < devices.Length; i++)
                 {
-                    if (devices[i].Type == DeviceType.Keyboard)
+                    if (devices[i].Type == DeviceType.Keyboard && devices[i].Name.Contains("Scope"))
                     {
                         keyboardIndex = i;
                         ledCount = devices[i].Leds.Length;

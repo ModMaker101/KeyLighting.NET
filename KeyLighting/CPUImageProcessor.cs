@@ -2,7 +2,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -248,44 +247,23 @@ public class CPUImageProcessor : IDisposable
         {
             unchecked
             {
+                uint totalR = 0, totalG = 0, totalB = 0;
                 int pixelCount = height;
                 int columnOffset = x * 3;
+
                 int y = 0;
-
-                Vector<ulong> sumR = Vector<ulong>.Zero;
-                Vector<ulong> sumG = Vector<ulong>.Zero;
-                Vector<ulong> sumB = Vector<ulong>.Zero;
-                int vectorSize = Vector<byte>.Count;
-
-                // Vectorized sum
-                for (; y <= height - vectorSize; y += vectorSize)
+                for (; y < height - 3; y += 4)
                 {
-                    Span<byte> colBytes = stackalloc byte[vectorSize * 3];
-                    for (int v = 0; v < vectorSize; v++)
-                    {
-                        int offset = (y + v) * stride + columnOffset;
-                        colBytes[v * 3 + 0] = pixelBuffer[offset];
-                        colBytes[v * 3 + 1] = pixelBuffer[offset + 1];
-                        colBytes[v * 3 + 2] = pixelBuffer[offset + 2];
-                    }
+                    int offset1 = y * stride + columnOffset;
+                    int offset2 = (y + 1) * stride + columnOffset;
+                    int offset3 = (y + 2) * stride + columnOffset;
+                    int offset4 = (y + 3) * stride + columnOffset;
 
-                    var vec = new Vector<byte>(colBytes);
-
-                    // Extract R, G, B channels and sum
-                    ulong r = 0, g = 0, b = 0;
-                    for (int v = 0; v < vectorSize; v++)
-                    {
-                        b += vec[v * 3 + 0];
-                        g += vec[v * 3 + 1];
-                        r += vec[v * 3 + 2];
-                    }
-                    sumR += new Vector<ulong>(r);
-                    sumG += new Vector<ulong>(g);
-                    sumB += new Vector<ulong>(b);
+                    totalB += (uint)pixelBuffer[offset1] + pixelBuffer[offset2] + pixelBuffer[offset3] + pixelBuffer[offset4];
+                    totalG += (uint)pixelBuffer[offset1 + 1] + pixelBuffer[offset2 + 1] + pixelBuffer[offset3 + 1] + pixelBuffer[offset4 + 1];
+                    totalR += (uint)pixelBuffer[offset1 + 2] + pixelBuffer[offset2 + 2] + pixelBuffer[offset3 + 2] + pixelBuffer[offset4 + 2];
                 }
 
-                // Scalar sum for remaining pixels
-                ulong totalR = 0, totalG = 0, totalB = 0;
                 for (; y < height; y++)
                 {
                     int offset = y * stride + columnOffset;
@@ -294,25 +272,15 @@ public class CPUImageProcessor : IDisposable
                     totalR += pixelBuffer[offset + 2];
                 }
 
-                // Add vectorized sums
-                for (int i = 0; i < Vector<ulong>.Count; i++)
-                {
-                    totalR += sumR[i];
-                    totalG += sumG[i];
-                    totalB += sumB[i];
-                }
-
-                byte avgR = (byte)(totalR / (ulong)pixelCount);
-                byte avgG = (byte)(totalG / (ulong)pixelCount);
-                byte avgB = (byte)(totalB / (ulong)pixelCount);
+                byte avgR = (byte)(totalR / pixelCount);
+                byte avgG = (byte)(totalG / pixelCount);
+                byte avgB = (byte)(totalB / pixelCount);
 
                 rawColors[x] = new OpenRGB.NET.Color(avgR, avgG, avgB);
             }
         });
     }
 
-
-    // Move the stackalloc and Vector<byte> creation outside the vectorized loop
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private void ExtractColumns32Bpp(int stride, int width, int height)
     {
@@ -320,42 +288,39 @@ public class CPUImageProcessor : IDisposable
         {
             unchecked
             {
+                uint totalR = 0, totalG = 0, totalB = 0;
                 int pixelCount = height;
                 int columnOffset = x * 4;
-                ulong totalR = 0, totalG = 0, totalB = 0;
 
-                // Process in blocks for cache efficiency
-                int blockSize = 32; // Tune for your CPU cache
                 int y = 0;
-                for (; y <= height - blockSize; y += blockSize)
+                for (; y < height - 3; y += 4)
                 {
-                    for (int b = 0; b < blockSize; b++)
-                    {
-                        int offset = (y + b) * stride + columnOffset;
-                        totalB += pixelBuffer![offset];
-                        totalG += pixelBuffer![offset + 1];
-                        totalR += pixelBuffer![offset + 2];
-                    }
+                    int offset1 = y * stride + columnOffset;
+                    int offset2 = (y + 1) * stride + columnOffset;
+                    int offset3 = (y + 2) * stride + columnOffset;
+                    int offset4 = (y + 3) * stride + columnOffset;
+
+                    totalB += (uint)(pixelBuffer[offset1] + pixelBuffer[offset2] + pixelBuffer[offset3] + pixelBuffer[offset4]);
+                    totalG += (uint)pixelBuffer[offset1 + 1] + pixelBuffer[offset2 + 1] + pixelBuffer[offset3 + 1] + pixelBuffer[offset4 + 1];
+                    totalR += (uint)pixelBuffer[offset1 + 2] + pixelBuffer[offset2 + 2] + pixelBuffer[offset3 + 2] + pixelBuffer[offset4 + 2];
                 }
-                // Process remaining pixels
+
                 for (; y < height; y++)
                 {
                     int offset = y * stride + columnOffset;
-                    totalB += pixelBuffer![offset];
-                    totalG += pixelBuffer![offset + 1];
-                    totalR += pixelBuffer![offset + 2];
+                    totalB += pixelBuffer[offset];
+                    totalG += pixelBuffer[offset + 1];
+                    totalR += pixelBuffer[offset + 2];
                 }
 
-                byte avgR = (byte)(totalR / (ulong)pixelCount);
-                byte avgG = (byte)(totalG / (ulong)pixelCount);
-                byte avgB = (byte)(totalB / (ulong)pixelCount);
+                byte avgR = (byte)(totalR / pixelCount);
+                byte avgG = (byte)(totalG / pixelCount);
+                byte avgB = (byte)(totalB / pixelCount);
 
                 rawColors[x] = new OpenRGB.NET.Color(avgR, avgG, avgB);
             }
         });
     }
-
-
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private void ProcessColumnsWithEffects(int width, double brightness, double vibrance, double contrast, int darkThreshold, double darkFactor)
@@ -429,48 +394,19 @@ public class CPUImageProcessor : IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    // Vectorized LUT initialization
     private void InitializeLuts(double brightness, double contrast)
     {
-        // Vectorized brightness LUT
-        if (Vector.IsHardwareAccelerated)
-        {
-            var brightnessVec = new Vector<float>((float)brightness);
-            int vecSize = Vector<float>.Count;
-            int i = 0;
-            for (; i <= 256 - vecSize; i += vecSize)
-            {
-                var indices = new Vector<float>(Enumerable.Range(i, vecSize).Select(x => (float)x).ToArray());
-                var result = Vector.Multiply(indices, brightnessVec);
-                for (int j = 0; j < vecSize; j++)
-                {
-                    brightnessLut[i + j] = (byte)Math.Clamp((int)result[j], 0, 255);
-                }
-            }
-            // Handle any remaining elements
-            for (; i < 256; i++)
-            {
-                int brightVal = (int)(i * brightness);
-                brightnessLut[i] = (byte)Math.Clamp(brightVal, 0, 255);
-            }
-        }
-        else
-        {
-            for (int i = 0; i < 256; i++)
-            {
-                int brightVal = (int)(i * brightness);
-                brightnessLut[i] = (byte)Math.Clamp(brightVal, 0, 255);
-            }
-        }
-
-        // Contrast LUT (not vectorized)
         for (int i = 0; i < 256; i++)
         {
+
+            int brightVal = (int)(i * brightness);
+            brightnessLut[i] = (byte)Math.Min(Math.Max(brightVal, 0), 255);
+
             if (Math.Abs(contrast - 1.0) > 0.001)
             {
                 double normalized = i / 255.0;
                 double adjusted = Math.Pow(normalized, contrast) * 255.0;
-                contrastLut[i] = (byte)Math.Clamp((int)adjusted, 0, 255);
+                contrastLut[i] = (byte)Math.Min(Math.Max((int)adjusted, 0), 255);
             }
             else
             {

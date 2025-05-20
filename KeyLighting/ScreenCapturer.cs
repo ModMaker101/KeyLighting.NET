@@ -7,9 +7,7 @@ using System.Collections.Generic;
 
 namespace KeyboardLighting
 {
-    /// <summary>
-    /// Platform-independent screen capture utility that works without Windows Forms
-    /// </summary>
+
     public class ScreenCapturer : IDisposable
     {
         #region Platform Detection
@@ -70,15 +68,9 @@ namespace KeyboardLighting
 
         #region Linux-specific imports
 
-        // These would be implemented when adding Linux support
-        // For example, using X11 or Wayland APIs
-
         #endregion
 
         #region MacOS-specific imports
-
-        // These would be implemented when adding macOS support
-        // For example, using CoreGraphics APIs
 
         #endregion
 
@@ -127,23 +119,20 @@ namespace KeyboardLighting
             }
             else if (IsLinux)
             {
-                // Linux implementation would go here
-                // For now, add a fallback monitor
+
                 monitors.Add(new Monitor(new Rectangle(0, 0, 1920, 1080), true, "Default"));
             }
             else if (IsMacOS)
             {
-                // macOS implementation would go here
-                // For now, add a fallback monitor
+
                 monitors.Add(new Monitor(new Rectangle(0, 0, 1920, 1080), true, "Default"));
             }
             else
             {
-                // Fallback for unknown platforms
+
                 monitors.Add(new Monitor(new Rectangle(0, 0, 1920, 1080), true, "Default"));
             }
 
-            // If no monitors were detected, add a default one
             if (monitors.Count == 0)
             {
                 monitors.Add(new Monitor(new Rectangle(0, 0, 1920, 1080), true, "Default"));
@@ -295,15 +284,13 @@ namespace KeyboardLighting
 
         private void CaptureToBufferLinux(Bitmap targetBuffer)
         {
-            // This would use an X11 or Wayland implementation to capture the screen
+
             Console.WriteLine("Linux screen capture not yet implemented");
 
-            // For now, just draw a test pattern
             using (Graphics g = Graphics.FromImage(targetBuffer))
             {
                 g.Clear(Color.DarkGray);
 
-                // Draw a grid pattern
                 using (Pen pen = new Pen(Color.LightGray, 1))
                 {
                     for (int x = 0; x < targetBuffer.Width; x += 20)
@@ -317,7 +304,6 @@ namespace KeyboardLighting
                     }
                 }
 
-                // Draw text
                 using (Font font = new Font("Arial", 24))
                 using (Brush brush = new SolidBrush(Color.White))
                 {
@@ -328,15 +314,13 @@ namespace KeyboardLighting
 
         private void CaptureToBufferMacOS(Bitmap targetBuffer)
         {
-            // This would use CoreGraphics to capture the screen
+
             Console.WriteLine("macOS screen capture not yet implemented");
 
-            // For now, just draw a test pattern
             using (Graphics g = Graphics.FromImage(targetBuffer))
             {
                 g.Clear(Color.DarkGray);
 
-                // Draw a grid pattern
                 using (Pen pen = new Pen(Color.LightGray, 1))
                 {
                     for (int x = 0; x < targetBuffer.Width; x += 20)
@@ -350,7 +334,6 @@ namespace KeyboardLighting
                     }
                 }
 
-                // Draw text
                 using (Font font = new Font("Arial", 24))
                 using (Brush brush = new SolidBrush(Color.White))
                 {

@@ -9,7 +9,6 @@ using KeyboardLighting;
 using Newtonsoft.Json;
 using OpenRGB.NET;
 
-
 public class CPUImageProcessor : IDisposable
 {
     private byte[]? pixelBuffer;
@@ -109,7 +108,6 @@ public class CPUImageProcessor : IDisposable
                 {
                     ProcessColumnsWithEffects(targetWidth, brightness, vibrance, contrast, darkThreshold, darkFactor);
 
-                    // Apply fading only if fade speed is less than 1.0
                     if (hasPreviousFrame && fadeSpeed < 1.0)
                     {
                         ApplyFading(targetWidth, fadeSpeed);
@@ -133,8 +131,6 @@ public class CPUImageProcessor : IDisposable
             }
         }
     }
-
-
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool AreSettingsCached(double brightness, double contrast)
@@ -179,8 +175,6 @@ public class CPUImageProcessor : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private void ApplyFading(int width, double fadeFactor)
     {
-        // This method should only be called when fadeSpeed < 1.0
-        // Simply use the provided fade factor without any brightness-based adjustments
 
         Parallel.For(0, width, i => {
             resultBuffer[i] = FastBlendColors(previousFrame[i], resultBuffer[i], fadeFactor);
@@ -193,7 +187,6 @@ public class CPUImageProcessor : IDisposable
         factor = Math.Clamp(factor, 0.0, 1.0);
         double inverseFactor = 1.0 - factor;
 
-        // Process each channel with adaptive blending
         byte r = (byte)(color1.R * inverseFactor + color2.R * factor);
         byte g = (byte)(color1.G * inverseFactor + color2.G * factor);
         byte b = (byte)(color1.B * inverseFactor + color2.B * factor);
@@ -201,15 +194,13 @@ public class CPUImageProcessor : IDisposable
         return new OpenRGB.NET.Color(r, g, b);
     }
 
-    // Also modify ProcessSolidColor method to handle brightness transitions better
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private void ProcessSolidColor(byte r, byte g, byte b, int width, double brightness, double vibrance, double contrast, int darkThreshold, double darkFactor)
     {
         OpenRGB.NET.Color processedColor = FastApplyEffects(r, g, b, brightness, vibrance, contrast, darkThreshold, darkFactor);
 
-        // Check if we need to apply fading
         bool needsFade = hasPreviousFrame &&
-                         fadeSpeed < 1.0 && // Only fade if fade speed is less than 1.0
+                         fadeSpeed < 1.0 &&
                          !(lastFrameWasSolid &&
                            lastSolidR == processedColor.R &&
                            lastSolidG == processedColor.G &&
@@ -217,14 +208,12 @@ public class CPUImageProcessor : IDisposable
 
         if (needsFade)
         {
-            // Calculate brightness values for current and previous frame
+
             int prevBrightness = lastSolidR + lastSolidG + lastSolidB;
             int newBrightness = processedColor.R + processedColor.G + processedColor.B;
 
-            // Determine if we're brightening or darkening
-            double fadeFactor = fadeSpeed; // Use the configured fade speed
+            double fadeFactor = fadeSpeed;
 
-            // Apply transition
             Parallel.For(0, width, i => {
                 resultBuffer[i] = FastBlendColors(previousFrame[i], processedColor, fadeFactor);
             });
